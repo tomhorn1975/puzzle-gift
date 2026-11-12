@@ -40,7 +40,7 @@ export default async function GiftPage({ params }: { params: Promise<{ id: strin
     )
   }
 
-  const sanitizedConfig = stripAnswers(gift.puzzle_config as MultipleChoicePuzzleConfig | MathPuzzleConfig)
+  const sanitizedConfig = stripAnswers(gift.puzzle_config as unknown as MultipleChoicePuzzleConfig | MathPuzzleConfig)
 
   return (
     <GiftSolve

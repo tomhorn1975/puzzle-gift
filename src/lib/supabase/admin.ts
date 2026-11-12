@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/lib/types'
+import type { Database } from '@/lib/database.types'
 
 // Service role client — NEVER expose to client, only use in API routes
 export function createAdminClient() {

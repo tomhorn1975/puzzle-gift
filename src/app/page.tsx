@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -13,13 +14,13 @@ export default async function LandingPage() {
         <div className="flex gap-3">
           {user ? (
             <>
-              <Button variant="ghost" asChild><Link href="/dashboard">My Gifts</Link></Button>
-              <Button asChild><Link href="/create">Create Gift</Link></Button>
+              <Link href="/dashboard" className={buttonVariants({ variant: 'ghost' })}>My Gifts</Link>
+              <Link href="/create" className={buttonVariants()}>Create Gift</Link>
             </>
           ) : (
             <>
-              <Button variant="ghost" asChild><Link href="/login">Sign In</Link></Button>
-              <Button asChild><Link href="/login">Get Started</Link></Button>
+              <Link href="/login" className={buttonVariants({ variant: 'ghost' })}>Sign In</Link>
+              <Link href="/login" className={buttonVariants()}>Get Started</Link>
             </>
           )}
         </div>
@@ -35,9 +36,12 @@ export default async function LandingPage() {
             Send photos, messages, and files locked behind a fun puzzle.
             Your recipient has to solve it before they can see what&apos;s inside.
           </p>
-          <Button size="lg" asChild>
-            <Link href={user ? '/create' : '/login'}>Send a Gift</Link>
-          </Button>
+          <Link
+            href={user ? '/create' : '/login'}
+            className={cn(buttonVariants({ size: 'lg' }))}
+          >
+            Send a Gift
+          </Link>
         </section>
 
         {/* How it works */}
@@ -88,9 +92,12 @@ export default async function LandingPage() {
         <section className="py-20 px-6 text-center bg-muted/40">
           <h2 className="text-3xl font-bold mb-4">Ready to surprise someone?</h2>
           <p className="text-muted-foreground mb-8">Free to use. No app to download. Just a link.</p>
-          <Button size="lg" asChild>
-            <Link href={user ? '/create' : '/login'}>Create your first gift</Link>
-          </Button>
+          <Link
+            href={user ? '/create' : '/login'}
+            className={cn(buttonVariants({ size: 'lg' }))}
+          >
+            Create your first gift
+          </Link>
         </section>
       </main>
 

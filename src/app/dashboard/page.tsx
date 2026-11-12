@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { GiftCard } from '@/components/gifts/GiftCard'
 
 export default async function DashboardPage() {
@@ -12,18 +12,24 @@ export default async function DashboardPage() {
 
   const { data: gifts } = await supabase
     .from('gifts')
-    .select(`
-      id, title, personal_message, content_type, puzzle_type,
-      is_active, expires_at, created_at,
-      gift_access(id)
-    `)
+    .select('id, title, content_type, puzzle_type, is_active, expires_at, created_at')
     .eq('sender_id', user.id)
     .order('created_at', { ascending: false })
 
+  // Count solves per gift
+  const giftIds = (gifts ?? []).map(g => g.id)
+  const { data: accessData } = giftIds.length > 0
+    ? await supabase.from('gift_access').select('gift_id').in('gift_id', giftIds)
+    : { data: [] }
+
+  const solveCounts = (accessData ?? []).reduce<Record<string, number>>((acc, row) => {
+    acc[row.gift_id] = (acc[row.gift_id] ?? 0) + 1
+    return acc
+  }, {})
+
   const giftsWithCount = (gifts ?? []).map(g => ({
     ...g,
-    solve_count: Array.isArray(g.gift_access) ? g.gift_access.length : 0,
-    gift_access: undefined,
+    solve_count: solveCounts[g.id] ?? 0,
   }))
 
   return (
@@ -33,9 +39,14 @@ export default async function DashboardPage() {
         <div className="flex gap-3 items-center">
           <span className="text-sm text-muted-foreground">{user.email}</span>
           <form action="/api/auth/signout" method="POST">
-            <Button variant="ghost" size="sm" type="submit">Sign Out</Button>
+            <button
+              type="submit"
+              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+            >
+              Sign Out
+            </button>
           </form>
-          <Button asChild size="sm"><Link href="/create">New Gift</Link></Button>
+          <Link href="/create" className={buttonVariants({ size: 'sm' })}>New Gift</Link>
         </div>
       </nav>
 
@@ -49,7 +60,7 @@ export default async function DashboardPage() {
                 : `${giftsWithCount.length} gift${giftsWithCount.length === 1 ? '' : 's'} sent`}
             </p>
           </div>
-          <Button asChild><Link href="/create">Create Gift</Link></Button>
+          <Link href="/create" className={buttonVariants()}>Create Gift</Link>
         </div>
 
         {giftsWithCount.length === 0 ? (
@@ -57,7 +68,7 @@ export default async function DashboardPage() {
             <p className="text-4xl mb-4">🎁</p>
             <p className="font-semibold text-lg mb-2">No gifts yet</p>
             <p className="text-muted-foreground text-sm mb-6">Create your first puzzle gift and share it with someone special.</p>
-            <Button asChild><Link href="/create">Create a Gift</Link></Button>
+            <Link href="/create" className={buttonVariants()}>Create a Gift</Link>
           </div>
         ) : (
           <div className="grid gap-4">

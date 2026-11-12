@@ -128,7 +128,7 @@ export function GiftForm({ userId }: Props) {
           file_path: filePath,
           text_content: contentType === 'text' ? textContent.trim() : null,
           puzzle_type: puzzleType,
-          puzzle_config: puzzleConfig,
+          puzzle_config: puzzleConfig as unknown as import('@/lib/database.types').Json,
           max_attempts: 5,
           is_active: true,
         })
@@ -169,7 +169,7 @@ export function GiftForm({ userId }: Props) {
           </div>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={() => setShareUrl(null)}>Create Another</Button>
-            <Button asChild><a href="/dashboard">View All Gifts</a></Button>
+            <a href="/dashboard" className="inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 h-8 gap-1.5 px-2.5 text-sm font-medium transition-all">View All Gifts</a>
           </div>
         </CardContent>
       </Card>

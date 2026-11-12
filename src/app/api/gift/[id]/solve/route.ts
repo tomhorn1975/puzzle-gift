@@ -38,10 +38,10 @@ export async function POST(
   let isCorrect = false
 
   if (gift.puzzle_type === 'multiple_choice') {
-    const config = gift.puzzle_config as MultipleChoicePuzzleConfig
+    const config = gift.puzzle_config as unknown as MultipleChoicePuzzleConfig
     isCorrect = config.questions.every(q => answers[q.id] === q.answer_index)
   } else if (gift.puzzle_type === 'math') {
-    const config = gift.puzzle_config as MathPuzzleConfig
+    const config = gift.puzzle_config as unknown as MathPuzzleConfig
     isCorrect = config.problems.every(p => Number(answers[p.id]) === p.answer)
   }
 
