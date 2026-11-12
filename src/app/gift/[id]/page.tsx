@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { GiftSolve } from '@/components/gift/GiftSolve'
 import type { SanitizedPuzzleConfig, MultipleChoicePuzzleConfig, MathPuzzleConfig } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 function stripAnswers(config: MultipleChoicePuzzleConfig | MathPuzzleConfig): SanitizedPuzzleConfig {
   if (config.type === 'multiple_choice') {
     return {
