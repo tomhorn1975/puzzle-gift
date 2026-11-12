@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic'
+export const instant = false
 
 export default async function LandingPage() {
   const supabase = await createClient()
