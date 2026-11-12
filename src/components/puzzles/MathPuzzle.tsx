@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { SanitizedMathPuzzleConfig } from '@/lib/types'
+import type { SanitizedMathConfig } from '@/lib/types'
 
 interface Props {
-  config: SanitizedMathPuzzleConfig
+  config: SanitizedMathConfig
   onSubmit: (answers: Record<string, number>) => void
   onRetry: () => void
   loading: boolean

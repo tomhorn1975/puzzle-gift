@@ -5,9 +5,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import type { ContentType } from '@/lib/types'
 
 interface Content {
-  type: 'text' | 'url'
+  type: 'text' | 'url' | 'assembled'
   value?: string
   url?: string
+  image_url?: string
+  message?: string | null
 }
 
 interface Props {
@@ -31,13 +33,7 @@ export function ContentReveal({ content, contentType }: Props) {
 
           {content.type === 'url' && contentType === 'image' && content.url && (
             <div className="relative w-full aspect-video rounded-lg overflow-hidden">
-              <Image
-                src={content.url}
-                alt="Gift content"
-                fill
-                className="object-contain"
-                unoptimized
-              />
+              <Image src={content.url} alt="Gift content" fill className="object-contain" unoptimized />
             </div>
           )}
 
@@ -51,6 +47,18 @@ export function ContentReveal({ content, contentType }: Props) {
               >
                 Download File
               </a>
+            </div>
+          )}
+
+          {content.type === 'assembled' && content.image_url && (
+            <div className="space-y-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={content.image_url} alt="Assembled puzzle" className="w-full rounded-xl" />
+              {content.message && (
+                <p className="text-base leading-relaxed text-center italic text-muted-foreground">
+                  &ldquo;{content.message}&rdquo;
+                </p>
+              )}
             </div>
           )}
         </CardContent>
