@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { connection } from 'next/server'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { buttonVariants } from '@/components/ui/button'
@@ -6,7 +7,10 @@ import { GiftCard } from '@/components/gifts/GiftCard'
 
 export const instant = false
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ payment?: string }> }) {
+  await connection()
+  const params = await searchParams
+  const paymentSuccess = params.payment === 'success'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -53,6 +57,15 @@ export default async function DashboardPage() {
       </nav>
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-10">
+        {paymentSuccess && (
+          <div className="mb-6 rounded-xl border-2 border-green-500/30 bg-green-50 p-4 flex items-start gap-3">
+            <span className="text-2xl">🎉</span>
+            <div>
+              <p className="font-semibold text-green-800">Payment successful! Your gift is live.</p>
+              <p className="text-sm text-green-700 mt-0.5">Copy the link from your gift below and share it with your recipient.</p>
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold">My Gifts</h1>

@@ -1,7 +1,14 @@
 export type { Database, Json } from './database.types'
 
 export type PuzzleType = 'trivia' | 'math' | 'slide' | 'jigsaw'
-export type ContentType = 'image' | 'file' | 'text'
+export type ContentType = 'image' | 'file' | 'text' | 'gift_card'
+
+export interface GiftCardBrand {
+  id: string
+  name: string
+  emoji: string
+  amounts: number[]
+}
 
 // ── Trivia ──────────────────────────────────────────────────────────────────
 export interface TriviaQuestion {

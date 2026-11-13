@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { connection } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { GiftSolve } from '@/components/gift/GiftSolve'
 import type {
@@ -27,6 +28,7 @@ function stripAnswers(config: PuzzleConfig): SanitizedPuzzleConfig {
 }
 
 export default async function GiftPage({ params }: { params: Promise<{ id: string }> }) {
+  await connection()
   const { id } = await params
   const supabase = await createClient()
 

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { connection } from 'next/server'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { GiftForm } from '@/components/create/GiftForm'
@@ -6,6 +7,7 @@ import { GiftForm } from '@/components/create/GiftForm'
 export const instant = false
 
 export default async function CreatePage() {
+  await connection()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

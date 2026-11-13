@@ -42,29 +42,32 @@ export function GiftCard({ gift }: Props) {
     setToggling(false)
   }
 
-  const puzzleLabel = gift.puzzle_type === 'multiple_choice' ? 'Multiple Choice' : 'Math'
-  const contentLabel = gift.content_type === 'text' ? 'Text' : gift.content_type === 'image' ? 'Image' : 'File'
+  const puzzleEmoji: Record<string, string> = {
+    trivia: '🧠', math: '➕', slide: '🔀', jigsaw: '🧩', multiple_choice: '🧠'
+  }
+  const puzzleLabel = `${puzzleEmoji[gift.puzzle_type] ?? '🎯'} ${gift.puzzle_type === 'multiple_choice' ? 'Trivia' : gift.puzzle_type.charAt(0).toUpperCase() + gift.puzzle_type.slice(1)}`
+  const contentLabel = gift.content_type === 'text' ? '📝 Text' : gift.content_type === 'image' ? '🖼 Image' : '📎 File'
   const createdDate = new Date(gift.created_at).toLocaleDateString()
 
   return (
-    <Card className={gift.is_active ? '' : 'opacity-60'}>
+    <Card className={`${gift.is_active ? 'border-l-4 border-l-primary' : 'opacity-60'}`}>
       <CardContent className="pt-5 pb-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h3 className="font-semibold truncate">{gift.title}</h3>
+              <h3 className="font-heading font-semibold truncate">{gift.title}</h3>
               {!gift.is_active && <Badge variant="secondary">Inactive</Badge>}
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <Badge variant="outline">{puzzleLabel}</Badge>
               <Badge variant="outline">{contentLabel}</Badge>
               <span>{createdDate}</span>
-              <span>{gift.solve_count} {gift.solve_count === 1 ? 'solve' : 'solves'}</span>
+              <span>🏆 {gift.solve_count} {gift.solve_count === 1 ? 'solve' : 'solves'}</span>
             </div>
           </div>
           <div className="flex gap-2 items-center shrink-0">
             <Button size="sm" variant="outline" onClick={copyLink}>
-              {copied ? 'Copied!' : 'Copy Link'}
+              {copied ? '✓ Copied!' : 'Copy Link'}
             </Button>
             <Button size="sm" variant="ghost" onClick={toggleActive} disabled={toggling}>
               {gift.is_active ? 'Deactivate' : 'Activate'}

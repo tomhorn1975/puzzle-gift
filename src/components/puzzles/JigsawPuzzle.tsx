@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Props {
   imageUrl: string
@@ -14,7 +14,6 @@ function shuffled(n: number): number[] {
     const j = Math.floor(Math.random() * (i + 1))
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
-  // ensure not accidentally solved
   if (arr.every((v, i) => v === i + 1)) arr[0] = arr.splice(1, 1, arr[0])[0]
   return arr
 }
@@ -27,12 +26,17 @@ const TILE_SIZE = 90
 
 export function JigsawPuzzle({ imageUrl, gridSize, onSolve }: Props) {
   const n = gridSize * gridSize
-  const [pieces, setPieces] = useState<number[]>(() => shuffled(n))
+  const totalSize = TILE_SIZE * gridSize
+  const [pieces, setPieces] = useState<number[] | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const [moves, setMoves] = useState(0)
-  const totalSize = TILE_SIZE * gridSize
+
+  useEffect(() => {
+    setPieces(shuffled(n))
+  }, [n])
 
   function handleClick(idx: number) {
+    if (!pieces) return
     if (selected === null) {
       setSelected(idx)
       return
@@ -46,10 +50,26 @@ export function JigsawPuzzle({ imageUrl, gridSize, onSolve }: Props) {
     setPieces(next)
     setSelected(null)
     setMoves(m => m + 1)
+    if (isSolved(next)) setTimeout(onSolve, 300)
+  }
 
-    if (isSolved(next)) {
-      setTimeout(onSolve, 300)
-    }
+  if (!pieces) {
+    return (
+      <div className="flex justify-center">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${gridSize}, ${TILE_SIZE}px)`,
+            gap: 2,
+            width: totalSize + (gridSize - 1) * 2,
+          }}
+        >
+          {Array.from({ length: n }).map((_, i) => (
+            <div key={i} style={{ width: TILE_SIZE, height: TILE_SIZE }} className="bg-muted rounded-sm animate-pulse" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -70,7 +90,6 @@ export function JigsawPuzzle({ imageUrl, gridSize, onSolve }: Props) {
             const origCol = (piece - 1) % gridSize
             const origRow = Math.floor((piece - 1) / gridSize)
             const isSelected = selected === idx
-
             return (
               <div
                 key={idx}

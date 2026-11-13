@@ -12,14 +12,27 @@ import { generateMathProblems } from '@/lib/puzzles/math'
 import type { PuzzleType, ContentType } from '@/lib/types'
 
 interface Props { userId: string }
-
 type Difficulty = 'easy' | 'medium' | 'hard'
+type GiftMode = 'regular' | 'gift_card'
 
 const PUZZLE_TYPES: { type: PuzzleType; emoji: string; label: string; desc: string }[] = [
-  { type: 'trivia',  emoji: '🧠', label: 'Trivia Quiz',      desc: 'Pick a category and difficulty. We\'ll fetch the questions.' },
-  { type: 'math',    emoji: '➗', label: 'Math Challenge',    desc: 'Choose a difficulty. We\'ll generate the problems.' },
-  { type: 'slide',   emoji: '◈',  label: 'Slide Puzzle',     desc: 'Upload an image. Recipients slide tiles to assemble it.' },
-  { type: 'jigsaw',  emoji: '🧩', label: 'Jigsaw Puzzle',    desc: 'Upload an image. Recipients tap pieces to put it together.' },
+  { type: 'trivia',  emoji: '🧠', label: 'Trivia Quiz',    desc: "Pick a category and difficulty. We'll fetch the questions." },
+  { type: 'math',    emoji: '➗', label: 'Math Challenge', desc: "Choose a difficulty. We'll generate the problems."           },
+  { type: 'slide',   emoji: '◈',  label: 'Slide Puzzle',  desc: 'Upload an image. Recipients slide tiles to assemble it.'     },
+  { type: 'jigsaw',  emoji: '🧩', label: 'Jigsaw Puzzle', desc: 'Upload an image. Recipients tap pieces to put it together.'  },
+]
+
+const GC_BRANDS = [
+  { id: 'AMAZONG3HV5',   name: 'Amazon',    emoji: '📦', amounts: [10,25,50,100,200] },
+  { id: 'V_STARBUCKS01', name: 'Starbucks', emoji: '☕', amounts: [10,25,50]         },
+  { id: 'V_APPLE_GC01',  name: 'Apple',     emoji: '🍎', amounts: [15,25,50,100]     },
+  { id: 'V_NETFLIX01',   name: 'Netflix',   emoji: '🎬', amounts: [15,25,30]         },
+  { id: 'V_TARGET_GC01', name: 'Target',    emoji: '🎯', amounts: [10,25,50,100]     },
+  { id: 'V_WALMART01',   name: 'Walmart',   emoji: '🛒', amounts: [10,25,50,100]     },
+  { id: 'V_DOORDASH01',  name: 'DoorDash',  emoji: '🍔', amounts: [15,25,50]         },
+  { id: 'V_SPOTIFY01',   name: 'Spotify',   emoji: '🎵', amounts: [10,30,60]         },
+  { id: 'V_UBER01',      name: 'Uber',      emoji: '🚗', amounts: [10,25,50]         },
+  { id: 'V_AIRBNB01',    name: 'Airbnb',    emoji: '🏠', amounts: [25,50,100,200]    },
 ]
 
 function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
@@ -28,7 +41,7 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
       type="button"
       onClick={onClick}
       className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-        active ? 'bg-foreground text-background border-foreground' : 'border-border hover:bg-muted'
+        active ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'
       }`}
     >
       {label}
@@ -39,52 +52,62 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
 export function GiftForm({ userId }: Props) {
   const supabase = createClient()
 
-  // Gift details
+  const [giftMode, setGiftMode] = useState<GiftMode>('regular')
+
   const [title, setTitle]     = useState('')
   const [message, setMessage] = useState('')
 
-  // Puzzle type
   const [puzzleType, setPuzzleType] = useState<PuzzleType | null>(null)
 
-  // Trivia settings
-  const [triviaCategory, setTriviaCategory] = useState(9)
+  const [triviaCategory, setTriviaCategory]     = useState(9)
   const [triviaDifficulty, setTriviaDifficulty] = useState<Difficulty>('medium')
   const [triviaCount, setTriviaCount]           = useState(4)
 
-  // Math settings
   const [mathDifficulty, setMathDifficulty] = useState<Difficulty>('medium')
   const [mathCount, setMathCount]           = useState(4)
 
-  // Slide/Jigsaw settings
-  const [puzzleImage, setPuzzleImage]   = useState<File | null>(null)
-  const [gridSize, setGridSize]         = useState<3 | 4>(3)
+  const [puzzleImage, setPuzzleImage] = useState<File | null>(null)
+  const [gridSize, setGridSize]       = useState<3 | 4>(3)
 
-  // Content (trivia/math only)
-  const [contentType, setContentType]   = useState<ContentType>('text')
-  const [textContent, setTextContent]   = useState('')
-  const [contentFile, setContentFile]   = useState<File | null>(null)
+  const [contentType, setContentType] = useState<ContentType>('text')
+  const [textContent, setTextContent] = useState('')
+  const [contentFile, setContentFile] = useState<File | null>(null)
 
-  // State
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState<string | null>(null)
-  const [shareUrl, setShareUrl] = useState<string | null>(null)
-  const [copied, setCopied]     = useState(false)
+  const [gcBrandId, setGcBrandId]     = useState<string | null>(null)
+  const [gcBrandName, setGcBrandName] = useState<string | null>(null)
+  const [gcAmount, setGcAmount]       = useState<number | null>(null)
 
-  const isImagePuzzle = puzzleType === 'slide' || puzzleType === 'jigsaw'
+  const [notificationEmail, setNotificationEmail] = useState('')
+
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState<string | null>(null)
+
+  const isImagePuzzle  = puzzleType === 'slide' || puzzleType === 'jigsaw'
+  const selectedBrand  = GC_BRANDS.find(b => b.id === gcBrandId)
+  const totalDisplay   = giftMode === 'gift_card' && gcAmount
+    ? `$${(gcAmount + 1.99).toFixed(2)}`
+    : '$1.00'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     if (!puzzleType) { setError('Please choose a puzzle type.'); return }
+    if (giftMode === 'gift_card' && (!gcBrandId || !gcAmount)) {
+      setError('Please select a gift card brand and amount.')
+      return
+    }
+    if (!notificationEmail.trim()) { setError('Please enter your email for notifications.'); return }
     setLoading(true)
+
+    let draftId: string | null = null
 
     try {
       const giftId = crypto.randomUUID()
+      draftId = giftId
       let puzzleConfig: unknown
       let filePath: string | null = null
-      let actualContentType: ContentType = contentType
+      let actualContentType: ContentType = giftMode === 'gift_card' ? 'gift_card' : contentType
 
-      // ── Build puzzle config ───────────────────────────────────────────────
       if (puzzleType === 'trivia') {
         const questions = await fetchTriviaQuestions(triviaCategory, triviaDifficulty, triviaCount)
         const cat = TRIVIA_CATEGORIES.find(c => c.id === triviaCategory)
@@ -95,94 +118,107 @@ export function GiftForm({ userId }: Props) {
         puzzleConfig = { type: 'math', difficulty: mathDifficulty, problems }
 
       } else {
-        // slide or jigsaw — upload image to public puzzle-images bucket
         if (!puzzleImage) throw new Error('Please upload an image for the puzzle.')
-        const ext   = puzzleImage.name.split('.').pop()
-        const path  = `${userId}/${giftId}.${ext}`
+        const ext  = puzzleImage.name.split('.').pop()
+        const path = `${userId}/${giftId}.${ext}`
         const { error: upErr } = await supabase.storage.from('puzzle-images').upload(path, puzzleImage)
         if (upErr) throw new Error(`Image upload failed: ${upErr.message}`)
         const imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/puzzle-images/${path}`
         puzzleConfig = { type: puzzleType, grid_size: gridSize, image_url: imageUrl }
-        actualContentType = 'text' // unused for slide/jigsaw
+        if (giftMode === 'regular') actualContentType = 'text'
       }
 
-      // ── Upload content file (trivia/math only) ────────────────────────────
-      if (!isImagePuzzle && (contentType === 'image' || contentType === 'file')) {
+      if (giftMode === 'regular' && !isImagePuzzle && (contentType === 'image' || contentType === 'file')) {
         if (!contentFile) throw new Error('Please select a file to share.')
-        const ext  = contentFile.name.split('.').pop()
-        filePath   = `${userId}/${giftId}/${Date.now()}.${ext}`
+        const ext = contentFile.name.split('.').pop()
+        filePath  = `${userId}/${giftId}/${Date.now()}.${ext}`
         const { error: upErr } = await supabase.storage.from('gift-content').upload(filePath, contentFile)
         if (upErr) throw new Error(`File upload failed: ${upErr.message}`)
       }
 
-      // ── Validate text content ─────────────────────────────────────────────
-      if (!isImagePuzzle && contentType === 'text' && !textContent.trim()) {
+      if (giftMode === 'regular' && !isImagePuzzle && contentType === 'text' && !textContent.trim()) {
         throw new Error('Please enter a message to share.')
       }
 
-      // ── Insert gift record ────────────────────────────────────────────────
-      const { data: gift, error: insertErr } = await supabase
-        .from('gifts')
-        .insert({
-          id: giftId,
-          sender_id: userId,
-          title: title.trim(),
-          personal_message: message.trim() || null,
-          content_type: actualContentType,
-          file_path: filePath,
-          text_content: (!isImagePuzzle && contentType === 'text') ? textContent.trim() : null,
-          puzzle_type: puzzleType,
-          puzzle_config: puzzleConfig as never,
-          max_attempts: 5,
-          is_active: true,
-        })
-        .select('id')
-        .single()
-
+      const { error: insertErr } = await supabase.from('gifts').insert({
+        id: giftId,
+        sender_id: userId,
+        title: title.trim(),
+        personal_message: message.trim() || null,
+        content_type: actualContentType,
+        file_path: filePath,
+        text_content: (giftMode === 'regular' && !isImagePuzzle && contentType === 'text') ? textContent.trim() : null,
+        puzzle_type: puzzleType,
+        puzzle_config: puzzleConfig as never,
+        max_attempts: 5,
+        is_active: false,
+        payment_status: 'pending',
+        notification_email: notificationEmail.trim() || null,
+        ...(giftMode === 'gift_card' ? {
+          gift_card_brand_id: gcBrandId,
+          gift_card_brand_name: gcBrandName,
+          gift_card_amount_cents: gcAmount! * 100,
+        } : {}),
+      })
       if (insertErr) throw new Error(insertErr.message)
 
-      setShareUrl(`${window.location.origin}/gift/${gift.id}`)
+      const checkoutRes = await fetch('/api/payments/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gift_id: giftId }),
+      })
+      const checkoutText = await checkoutRes.text()
+      let checkoutData: { url?: string; error?: string } = {}
+      try { checkoutData = JSON.parse(checkoutText) } catch { /* non-JSON response */ }
+      if (!checkoutRes.ok || !checkoutData.url) {
+        throw new Error(checkoutData.error ?? `Payment setup failed (${checkoutRes.status}). Make sure your Stripe keys are configured.`)
+      }
+
+      window.location.href = checkoutData.url
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
-    } finally {
+      if (draftId) {
+        await supabase.from('gifts').delete().eq('id', draftId).eq('sender_id', userId)
+      }
       setLoading(false)
     }
-  }
-
-  async function copyUrl() {
-    if (!shareUrl) return
-    await navigator.clipboard.writeText(shareUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  if (shareUrl) {
-    return (
-      <Card>
-        <CardHeader><CardTitle>Your gift is ready! 🎉</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground text-sm">Share this link. Your recipient will solve the puzzle to unlock it.</p>
-          <div className="flex gap-2">
-            <Input value={shareUrl} readOnly className="font-mono text-sm" />
-            <Button onClick={copyUrl} variant="outline" className="shrink-0">{copied ? 'Copied!' : 'Copy'}</Button>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" onClick={() => { setShareUrl(null); setPuzzleType(null); setTitle(''); setMessage('') }}>
-              Create Another
-            </Button>
-            <a href="/dashboard" className="inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 h-8 gap-1.5 px-2.5 text-sm font-medium transition-all">
-              View All Gifts
-            </a>
-          </div>
-        </CardContent>
-      </Card>
-    )
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
 
-      {/* Section 1: Gift Details */}
+      {/* Gift Mode Toggle */}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={() => setGiftMode('regular')}
+          className={`flex-1 py-4 px-5 rounded-2xl border-2 text-left transition-all ${
+            giftMode === 'regular'
+              ? 'border-primary bg-primary/5'
+              : 'border-border hover:border-primary/40'
+          }`}
+        >
+          <div className="text-2xl mb-1">🎁</div>
+          <div className="font-semibold text-sm">Regular Gift</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Text, image, or file — $1.00 to send</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setGiftMode('gift_card')}
+          className={`flex-1 py-4 px-5 rounded-2xl border-2 text-left transition-all ${
+            giftMode === 'gift_card'
+              ? 'border-primary bg-primary/5'
+              : 'border-border hover:border-primary/40'
+          }`}
+        >
+          <div className="text-2xl mb-1">💳</div>
+          <div className="font-semibold text-sm">Gift Card</div>
+          <div className="text-xs text-muted-foreground mt-0.5">We buy it, they earn it — from $11.99</div>
+        </button>
+      </div>
+
+      {/* Gift Details */}
       <Card>
         <CardHeader><CardTitle>Gift details</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -197,7 +233,66 @@ export function GiftForm({ userId }: Props) {
         </CardContent>
       </Card>
 
-      {/* Section 2: Choose Puzzle Type */}
+      {/* Gift Card Brand + Amount */}
+      {giftMode === 'gift_card' && (
+        <Card>
+          <CardHeader><CardTitle>Choose a gift card</CardTitle></CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <Label>Brand</Label>
+              <div className="grid grid-cols-5 gap-2">
+                {GC_BRANDS.map(brand => (
+                  <button
+                    key={brand.id}
+                    type="button"
+                    onClick={() => { setGcBrandId(brand.id); setGcBrandName(brand.name); setGcAmount(null) }}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-all ${
+                      gcBrandId === brand.id
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/40'
+                    }`}
+                  >
+                    <span className="text-2xl">{brand.emoji}</span>
+                    <span className="text-xs font-medium leading-tight">{brand.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {selectedBrand && (
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <div className="flex flex-wrap gap-2">
+                  {selectedBrand.amounts.map(amt => (
+                    <Chip key={amt} label={`$${amt}`} active={gcAmount === amt} onClick={() => setGcAmount(amt)} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {gcAmount && gcBrandName && (
+              <div className="rounded-xl bg-muted/60 p-4 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{gcBrandName} gift card</span>
+                  <span>${gcAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Puzzle fee</span>
+                  <span>$1.00</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Service fee</span>
+                  <span>$0.99</span>
+                </div>
+                <div className="flex justify-between font-semibold pt-1 border-t border-border">
+                  <span>Total</span>
+                  <span>${(gcAmount + 1.99).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Choose Puzzle Type */}
       <Card>
         <CardHeader><CardTitle>Choose your puzzle</CardTitle></CardHeader>
         <CardContent>
@@ -209,8 +304,8 @@ export function GiftForm({ userId }: Props) {
                 onClick={() => setPuzzleType(pt.type)}
                 className={`text-left p-4 rounded-xl border-2 transition-all ${
                   puzzleType === pt.type
-                    ? 'border-foreground bg-muted'
-                    : 'border-border hover:border-foreground/40 hover:bg-muted/40'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/40'
                 }`}
               >
                 <div className="text-2xl mb-2">{pt.emoji}</div>
@@ -222,7 +317,7 @@ export function GiftForm({ userId }: Props) {
         </CardContent>
       </Card>
 
-      {/* Section 3: Puzzle Settings */}
+      {/* Puzzle Settings */}
       {puzzleType && (
         <Card>
           <CardHeader><CardTitle>Puzzle settings</CardTitle></CardHeader>
@@ -245,16 +340,16 @@ export function GiftForm({ userId }: Props) {
                 <div className="space-y-2">
                   <Label>Difficulty</Label>
                   <div className="flex gap-2">
-                    {(['easy', 'medium', 'hard'] as Difficulty[]).map(d => (
-                      <Chip key={d} label={d.charAt(0).toUpperCase() + d.slice(1)} active={triviaDifficulty === d} onClick={() => setTriviaDifficulty(d)} />
+                    {(['easy','medium','hard'] as Difficulty[]).map(d => (
+                      <Chip key={d} label={d.charAt(0).toUpperCase()+d.slice(1)} active={triviaDifficulty===d} onClick={() => setTriviaDifficulty(d)} />
                     ))}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Number of questions</Label>
                   <div className="flex gap-2">
-                    {[3, 4, 5].map(n => (
-                      <Chip key={n} label={String(n)} active={triviaCount === n} onClick={() => setTriviaCount(n)} />
+                    {[3,4,5].map(n => (
+                      <Chip key={n} label={String(n)} active={triviaCount===n} onClick={() => setTriviaCount(n)} />
                     ))}
                   </div>
                 </div>
@@ -266,8 +361,8 @@ export function GiftForm({ userId }: Props) {
                 <div className="space-y-2">
                   <Label>Difficulty</Label>
                   <div className="flex gap-2">
-                    {(['easy', 'medium', 'hard'] as Difficulty[]).map(d => (
-                      <Chip key={d} label={d.charAt(0).toUpperCase() + d.slice(1)} active={mathDifficulty === d} onClick={() => setMathDifficulty(d)} />
+                    {(['easy','medium','hard'] as Difficulty[]).map(d => (
+                      <Chip key={d} label={d.charAt(0).toUpperCase()+d.slice(1)} active={mathDifficulty===d} onClick={() => setMathDifficulty(d)} />
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground pt-1">
@@ -279,8 +374,8 @@ export function GiftForm({ userId }: Props) {
                 <div className="space-y-2">
                   <Label>Number of problems</Label>
                   <div className="flex gap-2">
-                    {[3, 4, 5].map(n => (
-                      <Chip key={n} label={String(n)} active={mathCount === n} onClick={() => setMathCount(n)} />
+                    {[3,4,5].map(n => (
+                      <Chip key={n} label={String(n)} active={mathCount===n} onClick={() => setMathCount(n)} />
                     ))}
                   </div>
                 </div>
@@ -298,21 +393,21 @@ export function GiftForm({ userId }: Props) {
                     onChange={e => setPuzzleImage(e.target.files?.[0] ?? null)}
                     required
                   />
-                  {puzzleImage && (
-                    <p className="text-xs text-muted-foreground">{puzzleImage.name} ({(puzzleImage.size / 1024).toFixed(1)} KB)</p>
-                  )}
+                  {puzzleImage && <p className="text-xs text-muted-foreground">{puzzleImage.name} ({(puzzleImage.size/1024).toFixed(1)} KB)</p>}
                   <p className="text-xs text-muted-foreground">Square images work best. The image becomes the puzzle.</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Grid size</Label>
                   <div className="flex gap-2">
-                    <Chip label="3×3 — Easier (9 pieces)" active={gridSize === 3} onClick={() => setGridSize(3)} />
-                    <Chip label="4×4 — Harder (16 pieces)" active={gridSize === 4} onClick={() => setGridSize(4)} />
+                    <Chip label="3×3 — Easier (9 pieces)" active={gridSize===3} onClick={() => setGridSize(3)} />
+                    <Chip label="4×4 — Harder (16 pieces)" active={gridSize===4} onClick={() => setGridSize(4)} />
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground border rounded-lg p-3 bg-muted/40">
-                  The assembled image is the reveal. Your personal message above will appear after they solve it.
-                </p>
+                {giftMode === 'regular' && (
+                  <p className="text-sm text-muted-foreground border rounded-lg p-3 bg-muted/40">
+                    The assembled image is the reveal. Your personal message above will appear after they solve it.
+                  </p>
+                )}
               </>
             )}
 
@@ -320,22 +415,16 @@ export function GiftForm({ userId }: Props) {
         </Card>
       )}
 
-      {/* Section 4: What They'll Unlock (trivia/math only) */}
-      {puzzleType && !isImagePuzzle && (
+      {/* What they'll unlock (regular gifts only, not image puzzles) */}
+      {giftMode === 'regular' && puzzleType && !isImagePuzzle && (
         <Card>
           <CardHeader><CardTitle>What they&apos;ll unlock</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2">
-              {(['text', 'image', 'file'] as ContentType[]).map(t => (
-                <Chip
-                  key={t}
-                  label={t === 'text' ? 'Text message' : t === 'image' ? 'Image' : 'File'}
-                  active={contentType === t}
-                  onClick={() => setContentType(t)}
-                />
+              {(['text','image','file'] as ContentType[]).map(t => (
+                <Chip key={t} label={t==='text'?'Text message':t==='image'?'Image':'File'} active={contentType===t} onClick={() => setContentType(t)} />
               ))}
             </div>
-
             {contentType === 'text' && (
               <Textarea
                 value={textContent}
@@ -345,29 +434,67 @@ export function GiftForm({ userId }: Props) {
                 required
               />
             )}
-
             {(contentType === 'image' || contentType === 'file') && (
               <div className="space-y-1.5">
                 <Input
                   type="file"
-                  accept={contentType === 'image' ? 'image/*' : undefined}
+                  accept={contentType==='image'?'image/*':undefined}
                   onChange={e => setContentFile(e.target.files?.[0] ?? null)}
                   required
                 />
-                {contentFile && (
-                  <p className="text-xs text-muted-foreground">{contentFile.name} ({(contentFile.size / 1024).toFixed(1)} KB)</p>
-                )}
+                {contentFile && <p className="text-xs text-muted-foreground">{contentFile.name} ({(contentFile.size/1024).toFixed(1)} KB)</p>}
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
+      {/* Gift card how-it-works note */}
+      {giftMode === 'gift_card' && gcBrandId && gcAmount && (
+        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 text-sm">
+          <p className="font-semibold mb-1">💳 How the gift card works</p>
+          <p className="text-muted-foreground leading-relaxed">
+            We&apos;ll purchase a <strong>${gcAmount} {gcBrandName}</strong> gift card after payment.
+            The claim link will be hidden inside the puzzle — your recipient only sees it after solving.
+          </p>
+        </div>
+      )}
+
+      {/* Notification Email */}
+      <Card>
+        <CardHeader><CardTitle>Your email</CardTitle></CardHeader>
+        <CardContent className="space-y-1.5">
+          <Label htmlFor="notifEmail">We&apos;ll notify you when they solve it</Label>
+          <Input
+            id="notifEmail"
+            type="email"
+            value={notificationEmail}
+            onChange={e => setNotificationEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+          />
+        </CardContent>
+      </Card>
+
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button type="submit" size="lg" className="w-full" disabled={loading || !puzzleType || !title.trim()}>
-        {loading ? 'Creating your gift…' : 'Create Gift & Get Link'}
+      <Button
+        type="submit"
+        size="lg"
+        className="w-full text-base"
+        disabled={loading || !puzzleType || !title.trim() || !notificationEmail.trim()}
+      >
+        {loading
+          ? 'Setting up your gift…'
+          : `Pay ${totalDisplay} & ${giftMode === 'gift_card' ? 'Send Gift Card' : 'Send Gift'} →`}
       </Button>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Secure payment via Stripe.{' '}
+        {giftMode === 'gift_card'
+          ? 'Gift card is purchased instantly after payment.'
+          : 'Your gift goes live immediately after payment.'}
+      </p>
     </form>
   )
 }

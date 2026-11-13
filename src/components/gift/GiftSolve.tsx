@@ -42,7 +42,6 @@ export function GiftSolve({ giftId, title, personalMessage, contentType, puzzleT
     return res.json()
   }
 
-  // For trivia / math: submit answers, server verifies
   async function handleAnswerSubmit(answers: Record<string, number>) {
     setLoading(true)
     setErrorMessage(null)
@@ -63,7 +62,6 @@ export function GiftSolve({ giftId, title, personalMessage, contentType, puzzleT
     }
   }
 
-  // For slide / jigsaw: puzzle solved client-side, just record + get content
   async function handlePuzzleSolved() {
     setLoading(true)
     try {
@@ -73,7 +71,6 @@ export function GiftSolve({ giftId, title, personalMessage, contentType, puzzleT
         setState('correct')
       }
     } catch {
-      // fail silently — the puzzle IS solved, just couldn't record
       setState('correct')
     } finally {
       setLoading(false)
@@ -88,13 +85,18 @@ export function GiftSolve({ giftId, title, personalMessage, contentType, puzzleT
   const isImagePuzzle = puzzleType === 'slide' || puzzleType === 'jigsaw'
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start py-12 px-6">
+    <div className="min-h-screen flex flex-col items-center justify-start py-12 px-6 bg-background">
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
-          <p className="text-sm text-muted-foreground mb-1">You have a gift</p>
-          <h1 className="text-3xl font-bold">{title}</h1>
+          <div
+            className="inline-block px-4 py-2 rounded-full text-sm font-semibold text-white mb-4"
+            style={{ background: 'linear-gradient(135deg, oklch(0.52 0.27 292), oklch(0.65 0.26 345))' }}
+          >
+            🎁 You have a gift!
+          </div>
+          <h1 className="font-heading font-extrabold text-3xl md:text-4xl">{title}</h1>
           {personalMessage && !isImagePuzzle && (
-            <p className="mt-3 text-muted-foreground italic">&ldquo;{personalMessage}&rdquo;</p>
+            <p className="mt-3 text-muted-foreground italic text-base max-w-sm mx-auto">&ldquo;{personalMessage}&rdquo;</p>
           )}
         </div>
 
@@ -104,8 +106,8 @@ export function GiftSolve({ giftId, title, personalMessage, contentType, puzzleT
           <div className="space-y-4">
             {!isImagePuzzle && (
               <div className="text-center">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {state === 'wrong' ? '🔒 Not quite — try again!' : '🔒 Solve the puzzle to unlock your gift'}
+                <p className={`text-sm font-semibold ${state === 'wrong' ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {state === 'wrong' ? '🔐 Not quite right — give it another shot!' : '🔒 Solve the puzzle to unlock your gift'}
                 </p>
                 {errorMessage && state === 'wrong' && (
                   <p className="text-sm text-destructive mt-1">{errorMessage}</p>
@@ -115,7 +117,7 @@ export function GiftSolve({ giftId, title, personalMessage, contentType, puzzleT
 
             {isImagePuzzle && (
               <div className="text-center mb-2">
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-sm font-semibold text-muted-foreground">
                   {loading ? 'Unlocking…' : '🔒 Solve the puzzle to reveal your gift'}
                 </p>
               </div>

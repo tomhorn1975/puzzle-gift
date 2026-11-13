@@ -5,11 +5,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import type { ContentType } from '@/lib/types'
 
 interface Content {
-  type: 'text' | 'url' | 'assembled'
+  type: 'text' | 'url' | 'assembled' | 'gift_card'
   value?: string
   url?: string
   image_url?: string
   message?: string | null
+  brand_name?: string
+  amount_cents?: number
+  claim_link?: string
 }
 
 interface Props {
@@ -19,10 +22,11 @@ interface Props {
 
 export function ContentReveal({ content, contentType }: Props) {
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center py-4">
-        <p className="text-4xl mb-2">🎉</p>
-        <p className="font-semibold text-lg">You unlocked it!</p>
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="text-center py-6">
+        <div className="text-6xl mb-3 animate-bounce">🎉</div>
+        <h2 className="font-heading font-extrabold text-3xl mb-1 text-gradient-primary">You unlocked it!</h2>
+        <p className="text-muted-foreground text-sm">Congratulations — you earned this gift 🏆</p>
       </div>
 
       <Card>
@@ -59,6 +63,27 @@ export function ContentReveal({ content, contentType }: Props) {
                   &ldquo;{content.message}&rdquo;
                 </p>
               )}
+            </div>
+          )}
+          {content.type === 'gift_card' && content.claim_link && (
+            <div className="text-center space-y-5 py-2">
+              <div className="text-5xl">💳</div>
+              <div>
+                <p className="font-heading font-bold text-xl mb-1">
+                  {content.brand_name ?? 'Gift Card'} — ${content.amount_cents ? (content.amount_cents / 100).toFixed(0) : ''}
+                </p>
+                <p className="text-sm text-muted-foreground">Your gift card is ready. Click below to claim it.</p>
+              </div>
+              <a
+                href={content.claim_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition-all hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg, oklch(0.52 0.27 292), oklch(0.65 0.26 345))' }}
+              >
+                Claim Your Gift Card →
+              </a>
+              <p className="text-xs text-muted-foreground">Link opens in a new tab. Save it somewhere safe!</p>
             </div>
           )}
         </CardContent>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Props {
   imageUrl: string
@@ -10,10 +10,8 @@ interface Props {
 
 function scramble(gridSize: number): number[] {
   const n = gridSize * gridSize
-  // solved state: [1, 2, ..., n-1, 0]
   const tiles = [...Array(n - 1).keys()].map(i => i + 1)
   tiles.push(0)
-
   for (let i = 0; i < 150; i++) {
     const emptyIdx = tiles.indexOf(0)
     const emptyRow = Math.floor(emptyIdx / gridSize)
@@ -37,31 +35,50 @@ function isSolved(tiles: number[], gridSize: number): boolean {
 const TILE_SIZE = 90
 
 export function SlidePuzzle({ imageUrl, gridSize, onSolve }: Props) {
-  const [tiles, setTiles] = useState<number[]>(() => scramble(gridSize))
-  const [moves, setMoves] = useState(0)
   const totalSize = TILE_SIZE * gridSize
+  const n = gridSize * gridSize
+  const [tiles, setTiles] = useState<number[] | null>(null)
+  const [moves, setMoves] = useState(0)
+
+  useEffect(() => {
+    setTiles(scramble(gridSize))
+  }, [gridSize])
 
   function handleClick(idx: number) {
+    if (!tiles) return
     const emptyIdx = tiles.indexOf(0)
     const row = Math.floor(idx / gridSize)
     const col = idx % gridSize
     const emptyRow = Math.floor(emptyIdx / gridSize)
     const emptyCol = emptyIdx % gridSize
-
     const isAdjacent =
       (row === emptyRow && Math.abs(col - emptyCol) === 1) ||
       (col === emptyCol && Math.abs(row - emptyRow) === 1)
-
     if (!isAdjacent) return
-
     const next = [...tiles]
     ;[next[emptyIdx], next[idx]] = [next[idx], next[emptyIdx]]
     setTiles(next)
     setMoves(m => m + 1)
+    if (isSolved(next, gridSize)) setTimeout(onSolve, 300)
+  }
 
-    if (isSolved(next, gridSize)) {
-      setTimeout(onSolve, 300)
-    }
+  if (!tiles) {
+    return (
+      <div className="flex justify-center">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${gridSize}, ${TILE_SIZE}px)`,
+            gap: 2,
+            width: totalSize + (gridSize - 1) * 2,
+          }}
+        >
+          {Array.from({ length: n }).map((_, i) => (
+            <div key={i} style={{ width: TILE_SIZE, height: TILE_SIZE }} className="bg-muted rounded-sm animate-pulse" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -98,7 +115,6 @@ export function SlidePuzzle({ imageUrl, gridSize, onSolve }: Props) {
             const isAdjacent =
               (row === emptyRow && Math.abs(col - emptyCol) === 1) ||
               (col === emptyCol && Math.abs(row - emptyRow) === 1)
-
             return (
               <div
                 key={idx}

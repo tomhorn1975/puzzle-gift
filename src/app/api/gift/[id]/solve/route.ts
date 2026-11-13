@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { sendGiftSolvedEmail } from '@/lib/email'
 import type { TriviaConfig, MathConfig, SlideConfig, JigsawConfig } from '@/lib/types'
 
 export async function POST(
@@ -14,7 +15,7 @@ export async function POST(
 
   const { data: gift, error } = await supabase
     .from('gifts')
-    .select('id, content_type, file_path, text_content, puzzle_type, puzzle_config, personal_message, is_active, expires_at')
+    .select('id, title, content_type, file_path, text_content, puzzle_type, puzzle_config, personal_message, is_active, expires_at, notification_email, gift_card_brand_name, gift_card_amount_cents, gift_card_code')
     .eq('id', id)
     .single()
 
@@ -39,7 +40,6 @@ export async function POST(
     isCorrect = config.problems.every(p => Number(answers[p.id]) === p.answer)
 
   } else if (gift.puzzle_type === 'slide' || gift.puzzle_type === 'jigsaw') {
-    // Client-side solve — trust the flag; the puzzle component only calls this after genuine completion
     isCorrect = body.solved === true
   }
 
@@ -53,12 +53,33 @@ export async function POST(
     ip_address: request.headers.get('x-forwarded-for')?.split(',')[0] ?? null,
   })
 
+  // Send notification email (fire-and-forget)
+  if (gift.notification_email) {
+    sendGiftSolvedEmail({
+      to: gift.notification_email,
+      giftTitle: gift.title,
+      puzzleType: gift.puzzle_type,
+    }).catch(err => console.error('Failed to send solved notification:', err))
+  }
+
   // ── Return content ──────────────────────────────────────────────────────────
   if (gift.puzzle_type === 'slide' || gift.puzzle_type === 'jigsaw') {
     const config = gift.puzzle_config as unknown as SlideConfig | JigsawConfig
     return NextResponse.json({
       success: true,
       content: { type: 'assembled', image_url: config.image_url, message: gift.personal_message },
+    })
+  }
+
+  if (gift.content_type === 'gift_card') {
+    return NextResponse.json({
+      success: true,
+      content: {
+        type: 'gift_card',
+        brand_name: gift.gift_card_brand_name,
+        amount_cents: gift.gift_card_amount_cents,
+        claim_link: gift.gift_card_code,
+      },
     })
   }
 
