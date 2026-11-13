@@ -1,7 +1,11 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM = 'PuzzleGift <noreply@puzzlegift.app>'
+
+function getResend() {
+  if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === 're_REPLACE_ME') return null
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 export async function sendGiftSolvedEmail({
   to,
@@ -19,6 +23,8 @@ export async function sendGiftSolvedEmail({
     jigsaw: 'Jigsaw Puzzle',
   }
 
+  const resend = getResend()
+  if (!resend) return
   await resend.emails.send({
     from: FROM,
     to,
@@ -62,6 +68,8 @@ export async function sendGiftCreatedEmail({
     ? `<p style="font-size:16px;color:#374151;line-height:1.6;">A <strong>$${amountDollars} ${brandName} gift card</strong> has been purchased and locked inside. The recipient will only receive the claim link after solving the puzzle.</p>`
     : ''
 
+  const resend = getResend()
+  if (!resend) return
   await resend.emails.send({
     from: FROM,
     to,
