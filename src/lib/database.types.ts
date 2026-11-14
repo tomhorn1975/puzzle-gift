@@ -84,12 +84,16 @@ export type Database = {
           notification_email: string | null
           payment_status: string
           personal_message: string | null
-          puzzle_config: Json
-          puzzle_type: string
+          puzzle_config: Json | null
+          puzzle_type: string | null
           sender_id: string
           stripe_session_id: string | null
+          tasks: Json | null
+          tasks_approved_at: string | null
+          tasks_submitted_at: string | null
           text_content: string | null
           title: string
+          unlock_type: string
         }
         Insert: {
           content_type: string
@@ -106,12 +110,16 @@ export type Database = {
           notification_email?: string | null
           payment_status?: string
           personal_message?: string | null
-          puzzle_config: Json
-          puzzle_type: string
+          puzzle_config?: Json | null
+          puzzle_type?: string | null
           sender_id: string
           stripe_session_id?: string | null
+          tasks?: Json | null
+          tasks_approved_at?: string | null
+          tasks_submitted_at?: string | null
           text_content?: string | null
           title: string
+          unlock_type?: string
         }
         Update: {
           content_type?: string
@@ -128,12 +136,16 @@ export type Database = {
           notification_email?: string | null
           payment_status?: string
           personal_message?: string | null
-          puzzle_config?: Json
-          puzzle_type?: string
+          puzzle_config?: Json | null
+          puzzle_type?: string | null
           sender_id?: string
           stripe_session_id?: string | null
+          tasks?: Json | null
+          tasks_approved_at?: string | null
+          tasks_submitted_at?: string | null
           text_content?: string | null
           title?: string
+          unlock_type?: string
         }
         Relationships: []
       }
