@@ -95,3 +95,34 @@ export async function sendGiftCreatedEmail({
     `,
   })
 }
+
+export async function sendTasksSubmittedEmail({
+  to, giftTitle, giftId: _giftId,
+}: { to: string; giftTitle: string; giftId: string }) {
+  const resend = getResend()
+  if (!resend) return
+  const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `✅ "${giftTitle}" — tasks completed, waiting for your approval`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#faf5ff;border-radius:16px;">
+        <h1 style="font-size:28px;font-weight:800;color:#6d28d9;margin-bottom:8px;">✅ Tasks complete!</h1>
+        <p style="font-size:16px;color:#374151;line-height:1.6;">
+          Your recipient says they've completed all the tasks for <strong>"${giftTitle}"</strong>!
+        </p>
+        <p style="font-size:16px;color:#374151;line-height:1.6;">
+          Head to your dashboard to verify and approve — once you do, they'll be able to see their reward.
+        </p>
+        <div style="margin:24px 0;">
+          <a href="${dashboardUrl}" style="display:inline-block;background:#7c3aed;color:#fff;font-weight:700;font-size:16px;padding:14px 28px;border-radius:12px;text-decoration:none;">
+            Go Approve →
+          </a>
+        </div>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+        <p style="font-size:12px;color:#9ca3af;">PuzzleGift — Make every reveal a moment</p>
+      </div>
+    `,
+  })
+}

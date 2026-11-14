@@ -53,6 +53,8 @@ export function GiftForm({ userId }: Props) {
   const supabase = createClient()
 
   const [giftMode, setGiftMode] = useState<GiftMode>('regular')
+  const [unlockMode, setUnlockMode] = useState<'puzzle' | 'task_list'>('puzzle')
+  const [taskItems, setTaskItems]   = useState<string[]>(['', ''])
 
   const [title, setTitle]     = useState('')
   const [message, setMessage] = useState('')
@@ -91,7 +93,10 @@ export function GiftForm({ userId }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!puzzleType) { setError('Please choose a puzzle type.'); return }
+    if (unlockMode === 'puzzle' && !puzzleType) { setError('Please choose a puzzle type.'); return }
+    if (unlockMode === 'task_list' && taskItems.filter(t => t.trim()).length === 0) {
+      setError('Please add at least one task.'); return
+    }
     if (giftMode === 'gift_card' && (!gcBrandId || !gcAmount)) {
       setError('Please select a gift card brand and amount.')
       return
@@ -104,6 +109,49 @@ export function GiftForm({ userId }: Props) {
     try {
       const giftId = crypto.randomUUID()
       draftId = giftId
+
+      // ── Task list path ──────────────────────────────────────────────────────
+      if (unlockMode === 'task_list') {
+        const validTasks = taskItems.filter(t => t.trim()).map((text, i) => ({ id: String(i), text: text.trim() }))
+        const actualContentType: ContentType = giftMode === 'gift_card' ? 'gift_card' : contentType
+        let taskFilePath: string | null = null
+        if (giftMode === 'regular' && (contentType === 'image' || contentType === 'file')) {
+          if (!contentFile) throw new Error('Please select a file to share.')
+          const ext = contentFile.name.split('.').pop()
+          taskFilePath = `${userId}/${giftId}/${Date.now()}.${ext}`
+          const { error: upErr } = await supabase.storage.from('gift-content').upload(taskFilePath, contentFile)
+          if (upErr) throw new Error(`File upload failed: ${upErr.message}`)
+        }
+        if (giftMode === 'regular' && contentType === 'text' && !textContent.trim()) {
+          throw new Error('Please enter a message to share.')
+        }
+        const { error: insertErr } = await supabase.from('gifts').insert({
+          id: giftId, sender_id: userId, title: title.trim(),
+          personal_message: message.trim() || null,
+          content_type: actualContentType, file_path: taskFilePath,
+          text_content: (giftMode === 'regular' && contentType === 'text') ? textContent.trim() : null,
+          puzzle_type: null, puzzle_config: null,
+          unlock_type: 'task_list', tasks: validTasks as never,
+          max_attempts: 5, is_active: false, payment_status: 'pending',
+          notification_email: notificationEmail.trim() || null,
+          ...(giftMode === 'gift_card' ? { gift_card_brand_id: gcBrandId, gift_card_brand_name: gcBrandName, gift_card_amount_cents: gcAmount! * 100 } : {}),
+        } as never)
+        if (insertErr) throw new Error(insertErr.message)
+        const checkoutRes = await fetch('/api/payments/checkout', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gift_id: giftId }),
+        })
+        const checkoutText = await checkoutRes.text()
+        let checkoutData: { url?: string; error?: string } = {}
+        try { checkoutData = JSON.parse(checkoutText) } catch { /* non-JSON */ }
+        if (!checkoutRes.ok || !checkoutData.url) {
+          throw new Error(checkoutData.error ?? `Payment setup failed (${checkoutRes.status}).`)
+        }
+        window.location.href = checkoutData.url
+        return
+      }
+
+      // ── Puzzle path ─────────────────────────────────────────────────────────
       let puzzleConfig: unknown
       let filePath: string | null = null
       let actualContentType: ContentType = giftMode === 'gift_card' ? 'gift_card' : contentType
@@ -292,7 +340,78 @@ export function GiftForm({ userId }: Props) {
         </Card>
       )}
 
+      {/* Unlock Method */}
+      <Card>
+        <CardHeader><CardTitle>How do they unlock it?</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setUnlockMode('puzzle')}
+              className={`text-left p-4 rounded-xl border-2 transition-all ${
+                unlockMode === 'puzzle' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+              }`}
+            >
+              <div className="text-2xl mb-2">🧩</div>
+              <div className="font-semibold text-sm mb-1">Solve a Puzzle</div>
+              <div className="text-xs text-muted-foreground leading-snug">Trivia, math, slide or jigsaw — they solve it to unlock</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setUnlockMode('task_list'); setPuzzleType(null) }}
+              className={`text-left p-4 rounded-xl border-2 transition-all ${
+                unlockMode === 'task_list' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+              }`}
+            >
+              <div className="text-2xl mb-2">✅</div>
+              <div className="font-semibold text-sm mb-1">Complete Tasks</div>
+              <div className="text-xs text-muted-foreground leading-snug">You assign chores or a to-do list — you approve when they&apos;re done</div>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Task List Builder */}
+      {unlockMode === 'task_list' && (
+        <Card>
+          <CardHeader><CardTitle>Your task list</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">Add the tasks your recipient needs to complete. You&apos;ll get an email to approve when they claim they&apos;re done.</p>
+            {taskItems.map((task, i) => (
+              <div key={i} className="flex gap-2">
+                <Input
+                  value={task}
+                  onChange={e => {
+                    const next = [...taskItems]
+                    next[i] = e.target.value
+                    setTaskItems(next)
+                  }}
+                  placeholder={`Task ${i + 1}… e.g. "Take out the trash"`}
+                />
+                {taskItems.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setTaskItems(taskItems.filter((_, j) => j !== i))}
+                    className="text-muted-foreground hover:text-destructive text-sm px-2 shrink-0"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setTaskItems([...taskItems, ''])}
+              className="text-sm text-primary font-medium hover:underline"
+            >
+              + Add another task
+            </button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Choose Puzzle Type */}
+      {unlockMode === 'puzzle' && (
       <Card>
         <CardHeader><CardTitle>Choose your puzzle</CardTitle></CardHeader>
         <CardContent>
@@ -316,9 +435,10 @@ export function GiftForm({ userId }: Props) {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Puzzle Settings */}
-      {puzzleType && (
+      {unlockMode === 'puzzle' && puzzleType && (
         <Card>
           <CardHeader><CardTitle>Puzzle settings</CardTitle></CardHeader>
           <CardContent className="space-y-5">
@@ -416,7 +536,7 @@ export function GiftForm({ userId }: Props) {
       )}
 
       {/* What they'll unlock (regular gifts only, not image puzzles) */}
-      {giftMode === 'regular' && puzzleType && !isImagePuzzle && (
+      {giftMode === 'regular' && (unlockMode === 'task_list' || (puzzleType && !isImagePuzzle)) && (
         <Card>
           <CardHeader><CardTitle>What they&apos;ll unlock</CardTitle></CardHeader>
           <CardContent className="space-y-4">
@@ -482,7 +602,7 @@ export function GiftForm({ userId }: Props) {
         type="submit"
         size="lg"
         className="w-full text-base"
-        disabled={loading || !puzzleType || !title.trim() || !notificationEmail.trim()}
+        disabled={loading || (unlockMode === 'puzzle' && !puzzleType) || !title.trim() || !notificationEmail.trim()}
       >
         {loading
           ? 'Setting up your gift…'

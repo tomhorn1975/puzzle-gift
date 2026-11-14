@@ -2,6 +2,8 @@ export type { Database, Json } from './database.types'
 
 export type PuzzleType = 'trivia' | 'math' | 'slide' | 'jigsaw'
 export type ContentType = 'image' | 'file' | 'text' | 'gift_card'
+export type UnlockType = 'puzzle' | 'task_list'
+export interface Task { id: string; text: string }
 
 export interface GiftCardBrand {
   id: string

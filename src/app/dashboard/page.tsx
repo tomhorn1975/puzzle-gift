@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { buttonVariants } from '@/components/ui/button'
 import { GiftCard } from '@/components/gifts/GiftCard'
+import { TaskApproveButton } from '@/components/gifts/TaskApproveButton'
 
 export const instant = false
 
@@ -18,7 +19,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const { data: gifts } = await supabase
     .from('gifts')
-    .select('id, title, content_type, puzzle_type, is_active, expires_at, created_at')
+    .select('id, title, content_type, puzzle_type, is_active, expires_at, created_at, unlock_type, tasks, tasks_submitted_at, tasks_approved_at')
     .eq('sender_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -33,10 +34,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     return acc
   }, {})
 
+  type GiftRow = NonNullable<typeof gifts>[number] & {
+    unlock_type?: string
+    tasks?: Array<{ id: string; text: string }>
+    tasks_submitted_at?: string | null
+    tasks_approved_at?: string | null
+  }
+
   const giftsWithCount = (gifts ?? []).map(g => ({
     ...g,
     solve_count: solveCounts[g.id] ?? 0,
-  }))
+  })) as (GiftRow & { solve_count: number })[]
+
+  const pendingApprovals = giftsWithCount.filter(g =>
+    g.unlock_type === 'task_list' && g.tasks_submitted_at && !g.tasks_approved_at
+  )
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -77,6 +89,34 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
           <Link href="/create" className={buttonVariants()}>Create Gift</Link>
         </div>
+
+        {pendingApprovals.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-bold mb-3">🔔 Needs Your Approval ({pendingApprovals.length})</h2>
+            <div className="grid gap-4">
+              {pendingApprovals.map(gift => (
+                <div key={gift.id} className="rounded-xl border-2 border-amber-400/50 bg-amber-50 p-5 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{gift.title}</p>
+                      <p className="text-sm text-amber-700 mt-0.5">Your recipient says they&apos;ve completed all tasks!</p>
+                    </div>
+                    <TaskApproveButton giftId={gift.id} />
+                  </div>
+                  {gift.tasks && (
+                    <ul className="space-y-1">
+                      {gift.tasks.map(task => (
+                        <li key={task.id} className="text-sm text-muted-foreground flex items-center gap-2">
+                          <span className="text-green-500">✓</span> {task.text}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {giftsWithCount.length === 0 ? (
           <div className="text-center py-24 border rounded-2xl">

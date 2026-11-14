@@ -34,7 +34,7 @@ export default async function GiftPage({ params }: { params: Promise<{ id: strin
 
   const { data: gift } = await supabase
     .from('gifts')
-    .select('id, title, personal_message, content_type, puzzle_type, puzzle_config, is_active, expires_at')
+    .select('id, title, personal_message, content_type, puzzle_type, puzzle_config, is_active, expires_at, unlock_type, tasks, tasks_submitted_at, tasks_approved_at')
     .eq('id', id)
     .single()
 
@@ -52,17 +52,28 @@ export default async function GiftPage({ params }: { params: Promise<{ id: strin
     )
   }
 
-  const rawConfig = gift.puzzle_config as unknown as PuzzleConfig
-  const sanitizedConfig = stripAnswers(rawConfig)
+  const g = gift as typeof gift & {
+    unlock_type?: string
+    tasks?: Array<{ id: string; text: string }>
+    tasks_submitted_at?: string | null
+    tasks_approved_at?: string | null
+  }
+
+  const rawConfig = g.puzzle_config as unknown as PuzzleConfig | null
+  const sanitizedConfig = rawConfig ? stripAnswers(rawConfig) : null
 
   return (
     <GiftSolve
-      giftId={gift.id}
-      title={gift.title}
-      personalMessage={gift.personal_message}
-      contentType={gift.content_type as ContentType}
-      puzzleType={gift.puzzle_type as PuzzleType}
-      puzzleConfig={sanitizedConfig}
+      giftId={g.id}
+      title={g.title}
+      personalMessage={g.personal_message}
+      contentType={g.content_type as ContentType}
+      puzzleType={(g.puzzle_type as PuzzleType) ?? undefined}
+      puzzleConfig={sanitizedConfig ?? undefined}
+      unlockType={(g.unlock_type as 'puzzle' | 'task_list') ?? 'puzzle'}
+      tasks={g.tasks ?? undefined}
+      tasksSubmittedAt={g.tasks_submitted_at ?? null}
+      tasksApprovedAt={g.tasks_approved_at ?? null}
     />
   )
 }
