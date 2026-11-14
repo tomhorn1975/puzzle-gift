@@ -25,8 +25,8 @@ export async function POST(
   if (!g.tasks_approved_at)
     return NextResponse.json({ approved: false }, { status: 403 })
 
-  await admin.from('gift_access').insert({ gift_id: g.id, ip_address: null } as never)
-    .then(() => {}).catch(() => {})
+  admin.from('gift_access').insert({ gift_id: g.id, ip_address: null } as never)
+    .then(() => null).catch(() => null)
 
   if (g.content_type === 'gift_card') {
     return NextResponse.json({

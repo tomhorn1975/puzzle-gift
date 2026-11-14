@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 interface GiftSummary {
   id: string
   title: string
-  puzzle_type: string
+  puzzle_type: string | null
   content_type: string
   is_active: boolean
   created_at: string
@@ -45,7 +45,8 @@ export function GiftCard({ gift }: Props) {
   const puzzleEmoji: Record<string, string> = {
     trivia: '🧠', math: '➕', slide: '🔀', jigsaw: '🧩', multiple_choice: '🧠'
   }
-  const puzzleLabel = `${puzzleEmoji[gift.puzzle_type] ?? '🎯'} ${gift.puzzle_type === 'multiple_choice' ? 'Trivia' : gift.puzzle_type.charAt(0).toUpperCase() + gift.puzzle_type.slice(1)}`
+  const pt = gift.puzzle_type ?? 'task_list'
+  const puzzleLabel = pt === 'task_list' ? '✅ Task List' : `${puzzleEmoji[pt] ?? '🎯'} ${pt === 'multiple_choice' ? 'Trivia' : pt.charAt(0).toUpperCase() + pt.slice(1)}`
   const contentLabel = gift.content_type === 'text' ? '📝 Text' : gift.content_type === 'image' ? '🖼 Image' : '📎 File'
   const createdDate = new Date(gift.created_at).toLocaleDateString()
 

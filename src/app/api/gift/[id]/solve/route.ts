@@ -56,9 +56,9 @@ export async function POST(
   // Send notification email (fire-and-forget)
   if (gift.notification_email) {
     sendGiftSolvedEmail({
-      to: gift.notification_email,
+      to: gift.notification_email!,
       giftTitle: gift.title,
-      puzzleType: gift.puzzle_type,
+      puzzleType: gift.puzzle_type ?? 'unknown',
     }).catch(err => console.error('Failed to send solved notification:', err))
   }
 
