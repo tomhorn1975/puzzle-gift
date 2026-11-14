@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { stripe, PUZZLE_FEE_CENTS, GIFT_CARD_SERVICE_FEE_CENTS } from '@/lib/stripe'
+import { getStripe, PUZZLE_FEE_CENTS, GIFT_CARD_SERVICE_FEE_CENTS } from '@/lib/stripe'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
   let session
   try {
-    session = await stripe.checkout.sessions.create({
+    session = await getStripe().checkout.sessions.create({
       mode: 'payment',
       line_items: lineItems,
       success_url: `${origin}/dashboard?payment=success`,
