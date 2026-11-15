@@ -156,9 +156,10 @@ export function GiftForm({ userId }: Props) {
     try {
       const giftId = crypto.randomUUID()
       draftId = giftId
+      const currentUnlockMode = unlockMode as string
 
-      // ── Task list path ──────────────────────────────────────────────────────
-      if (unlockMode === 'task_list') {
+      // ── Task list path (non-amazon) ─────────────────────────────────────────
+      if (currentUnlockMode === 'task_list' && giftMode !== 'amazon_prize') {
         const validTasks = taskItems.filter(t => t.trim()).map((text, i) => ({ id: String(i), text: text.trim() }))
         const actualContentType: ContentType = giftMode === 'gift_card' ? 'gift_card' : contentType
         let taskFilePath: string | null = null
@@ -200,11 +201,10 @@ export function GiftForm({ userId }: Props) {
 
       // ── Amazon Prize path ───────────────────────────────────────────────────
       if (giftMode === 'amazon_prize') {
-        if (unlockMode === 'puzzle' && !puzzleType) throw new Error('Please choose a puzzle type.')
+        if (currentUnlockMode === 'puzzle' && !puzzleType) throw new Error('Please choose a puzzle type.')
         const amountCents = Math.round(parseFloat(amazonAmount) * 100)
-        // Build puzzle config for amazon prize
         let apPuzzleConfig: unknown = null
-        if (unlockMode === 'puzzle') {
+        if (currentUnlockMode === 'puzzle') {
           if (puzzleType === 'trivia') {
             const questions = await fetchTriviaQuestions(triviaCategory, triviaDifficulty, triviaCount)
             const cat = TRIVIA_CATEGORIES.find(c => c.id === triviaCategory)
@@ -219,17 +219,17 @@ export function GiftForm({ userId }: Props) {
             if (!riddleQuestion.trim() || !riddleAnswer.trim()) throw new Error('Please enter both a question and answer.')
             apPuzzleConfig = { type: 'riddle', question: riddleQuestion.trim(), answer: riddleAnswer.trim() }
           }
-        } else if (unlockMode === 'task_list') {
+        } else if (currentUnlockMode === 'task_list') {
           apPuzzleConfig = null
         }
         const { error: insertErr } = await supabase.from('gifts').insert({
           id: giftId, sender_id: userId, title: title.trim(),
           personal_message: message.trim() || null,
           content_type: 'amazon_prize',
-          puzzle_type: unlockMode === 'task_list' ? null : puzzleType,
+          puzzle_type: currentUnlockMode === 'task_list' ? null : puzzleType,
           puzzle_config: apPuzzleConfig as never,
-          unlock_type: unlockMode,
-          tasks: unlockMode === 'task_list' ? taskItems.filter(t => t.trim()).map((text, i) => ({ id: String(i), text: text.trim() })) as never : null,
+          unlock_type: currentUnlockMode,
+          tasks: currentUnlockMode === 'task_list' ? taskItems.filter(t => t.trim()).map((text, i) => ({ id: String(i), text: text.trim() })) as never : null,
           max_attempts: 5, is_active: false, payment_status: 'pending',
           notification_email: notificationEmail.trim() || null,
           amazon_product_url: amazonUrl.trim(),
