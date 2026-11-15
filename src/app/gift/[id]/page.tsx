@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { GiftSolve } from '@/components/gift/GiftSolve'
 import type {
   SanitizedPuzzleConfig,
-  TriviaConfig, MathConfig, SlideConfig, JigsawConfig,
+  TriviaConfig, MathConfig, SlideConfig, JigsawConfig, RiddleConfig,
   PuzzleConfig, PuzzleType, ContentType,
 } from '@/lib/types'
 
@@ -23,7 +23,10 @@ function stripAnswers(config: PuzzleConfig): SanitizedPuzzleConfig {
       problems: config.problems.map(({ answer: _a, ...p }) => p),
     }
   }
-  // slide/jigsaw: image_url needed on client, no answers to strip
+  if (config.type === 'riddle') {
+    return { type: 'riddle', question: (config as RiddleConfig).question }
+  }
+  // slide/jigsaw/word_scramble: no answers to strip
   return config as SlideConfig | JigsawConfig
 }
 

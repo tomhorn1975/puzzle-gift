@@ -70,6 +70,10 @@ export type Database = {
       }
       gifts: {
         Row: {
+          amazon_prize_amount_cents: number | null
+          amazon_product_image: string | null
+          amazon_product_title: string | null
+          amazon_product_url: string | null
           content_type: string
           created_at: string
           expires_at: string | null
@@ -96,6 +100,10 @@ export type Database = {
           unlock_type: string
         }
         Insert: {
+          amazon_prize_amount_cents?: number | null
+          amazon_product_image?: string | null
+          amazon_product_title?: string | null
+          amazon_product_url?: string | null
           content_type: string
           created_at?: string
           expires_at?: string | null
@@ -122,6 +130,10 @@ export type Database = {
           unlock_type?: string
         }
         Update: {
+          amazon_prize_amount_cents?: number | null
+          amazon_product_image?: string | null
+          amazon_product_title?: string | null
+          amazon_product_url?: string | null
           content_type?: string
           created_at?: string
           expires_at?: string | null
@@ -148,6 +160,53 @@ export type Database = {
           unlock_type?: string
         }
         Relationships: []
+      }
+      prize_claims: {
+        Row: {
+          address_line1: string
+          address_line2: string | null
+          city: string
+          country: string
+          created_at: string
+          gift_id: string
+          id: string
+          recipient_name: string
+          state: string
+          zip: string
+        }
+        Insert: {
+          address_line1: string
+          address_line2?: string | null
+          city: string
+          country?: string
+          created_at?: string
+          gift_id: string
+          id?: string
+          recipient_name: string
+          state: string
+          zip: string
+        }
+        Update: {
+          address_line1?: string
+          address_line2?: string | null
+          city?: string
+          country?: string
+          created_at?: string
+          gift_id?: string
+          id?: string
+          recipient_name?: string
+          state?: string
+          zip?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prize_claims_gift_id_fkey"
+            columns: ["gift_id"]
+            isOneToOne: false
+            referencedRelation: "gifts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

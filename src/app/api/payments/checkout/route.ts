@@ -14,15 +14,21 @@ export async function POST(request: Request) {
   const admin = createAdminClient()
   const { data: gift } = await admin
     .from('gifts')
-    .select('id, title, content_type, gift_card_amount_cents, gift_card_brand_name, payment_status')
+    .select('id, title, content_type, gift_card_amount_cents, gift_card_brand_name, payment_status, amazon_product_title, amazon_prize_amount_cents')
     .eq('id', body.gift_id)
     .eq('sender_id', user.id)
     .single()
 
-  if (!gift) return NextResponse.json({ error: 'Gift not found' }, { status: 404 })
-  if (gift.payment_status !== 'pending') return NextResponse.json({ error: 'Gift already processed' }, { status: 409 })
+  const g = gift as typeof gift & {
+    amazon_product_title?: string | null
+    amazon_prize_amount_cents?: number | null
+  }
 
-  const isGiftCard = gift.content_type === 'gift_card'
+  if (!g) return NextResponse.json({ error: 'Gift not found' }, { status: 404 })
+  if (g.payment_status !== 'pending') return NextResponse.json({ error: 'Gift already processed' }, { status: 409 })
+
+  const isGiftCard = g.content_type === 'gift_card'
+  const isAmazonPrize = g.content_type === 'amazon_prize'
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
   type LineItem = {
@@ -38,22 +44,22 @@ export async function POST(request: Request) {
     {
       price_data: {
         currency: 'usd',
-        product_data: { name: 'PuzzleGift — Send a Puzzle', description: `Gift: "${gift.title}"` },
+        product_data: { name: 'PuzzleGift — Send a Puzzle', description: `Gift: "${g.title}"` },
         unit_amount: PUZZLE_FEE_CENTS,
       },
       quantity: 1,
     },
   ]
 
-  if (isGiftCard && gift.gift_card_amount_cents) {
+  if (isGiftCard && g.gift_card_amount_cents) {
     lineItems.push({
       price_data: {
         currency: 'usd',
         product_data: {
-          name: `${gift.gift_card_brand_name ?? 'Gift Card'} — $${(gift.gift_card_amount_cents / 100).toFixed(0)}`,
+          name: `${g.gift_card_brand_name ?? 'Gift Card'} — $${(g.gift_card_amount_cents / 100).toFixed(0)}`,
           description: 'Digital gift card — purchased and locked until puzzle solved',
         },
-        unit_amount: gift.gift_card_amount_cents,
+        unit_amount: g.gift_card_amount_cents,
       },
       quantity: 1,
     })
@@ -67,6 +73,28 @@ export async function POST(request: Request) {
     })
   }
 
+  if (isAmazonPrize && g.amazon_prize_amount_cents) {
+    lineItems.push({
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: g.amazon_product_title ?? 'Amazon Prize',
+          description: 'Prize — you will ship this after recipient wins and submits their address',
+        },
+        unit_amount: g.amazon_prize_amount_cents,
+      },
+      quantity: 1,
+    })
+    lineItems.push({
+      price_data: {
+        currency: 'usd',
+        product_data: { name: 'Prize Service Fee' },
+        unit_amount: GIFT_CARD_SERVICE_FEE_CENTS,
+      },
+      quantity: 1,
+    })
+  }
+
   let session
   try {
     session = await getStripe().checkout.sessions.create({
@@ -74,7 +102,7 @@ export async function POST(request: Request) {
       line_items: lineItems,
       success_url: `${origin}/dashboard?payment=success`,
       cancel_url: `${origin}/create?payment=cancelled`,
-      metadata: { gift_id: gift.id, user_id: user.id },
+      metadata: { gift_id: g.id, user_id: user.id },
       customer_email: user.email ?? undefined,
     })
   } catch (err) {
@@ -86,7 +114,7 @@ export async function POST(request: Request) {
   await admin
     .from('gifts')
     .update({ stripe_session_id: session.id })
-    .eq('id', gift.id)
+    .eq('id', g.id)
 
   return NextResponse.json({ url: session.url })
 }

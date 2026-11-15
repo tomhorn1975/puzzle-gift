@@ -1,7 +1,7 @@
 export type { Database, Json } from './database.types'
 
-export type PuzzleType = 'trivia' | 'math' | 'slide' | 'jigsaw'
-export type ContentType = 'image' | 'file' | 'text' | 'gift_card'
+export type PuzzleType = 'trivia' | 'math' | 'slide' | 'jigsaw' | 'word_scramble' | 'riddle'
+export type ContentType = 'image' | 'file' | 'text' | 'gift_card' | 'amazon_prize'
 export type UnlockType = 'puzzle' | 'task_list'
 export interface Task { id: string; text: string }
 
@@ -53,7 +53,26 @@ export interface JigsawConfig {
   image_url: string
 }
 
-export type PuzzleConfig = TriviaConfig | MathConfig | SlideConfig | JigsawConfig
+// ── Word Scramble ─────────────────────────────────────────────────────────────
+export interface WordScrambleConfig {
+  type: 'word_scramble'
+  word: string
+  scrambled: string
+  hint?: string
+}
+
+// ── Riddle ────────────────────────────────────────────────────────────────────
+export interface RiddleConfig {
+  type: 'riddle'
+  question: string
+  answer: string
+}
+export interface SanitizedRiddleConfig {
+  type: 'riddle'
+  question: string
+}
+
+export type PuzzleConfig = TriviaConfig | MathConfig | SlideConfig | JigsawConfig | WordScrambleConfig | RiddleConfig
 
 // ── Sanitized (safe for client — answers stripped) ────────────────────────────
 export interface SanitizedTriviaQuestion {
@@ -73,12 +92,14 @@ export interface SanitizedMathConfig {
   type: 'math'
   problems: SanitizedMathProblem[]
 }
-// Slide/jigsaw have no answers to strip
+// Slide/jigsaw/word_scramble have no answers to strip; riddle does
 export type SanitizedPuzzleConfig =
   | SanitizedTriviaConfig
   | SanitizedMathConfig
   | SlideConfig
   | JigsawConfig
+  | WordScrambleConfig
+  | SanitizedRiddleConfig
 
 // ── Legacy types (kept for reference, not used in new gifts) ─────────────────
 export interface MultipleChoiceQuestion {

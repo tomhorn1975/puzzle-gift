@@ -13,13 +13,15 @@ import type { PuzzleType, ContentType } from '@/lib/types'
 
 interface Props { userId: string }
 type Difficulty = 'easy' | 'medium' | 'hard'
-type GiftMode = 'regular' | 'gift_card'
+type GiftMode = 'regular' | 'gift_card' | 'amazon_prize'
 
 const PUZZLE_TYPES: { type: PuzzleType; emoji: string; label: string; desc: string }[] = [
-  { type: 'trivia',  emoji: '🧠', label: 'Trivia Quiz',    desc: "Pick a category and difficulty. We'll fetch the questions." },
-  { type: 'math',    emoji: '➗', label: 'Math Challenge', desc: "Choose a difficulty. We'll generate the problems."           },
-  { type: 'slide',   emoji: '◈',  label: 'Slide Puzzle',  desc: 'Upload an image. Recipients slide tiles to assemble it.'     },
-  { type: 'jigsaw',  emoji: '🧩', label: 'Jigsaw Puzzle', desc: 'Upload an image. Recipients tap pieces to put it together.'  },
+  { type: 'trivia',       emoji: '🧠', label: 'Trivia Quiz',     desc: "Pick a category and difficulty. We'll fetch the questions." },
+  { type: 'math',         emoji: '➗', label: 'Math Challenge',  desc: "Choose a difficulty. We'll generate the problems."           },
+  { type: 'word_scramble',emoji: '🔤', label: 'Word Scramble',   desc: 'You pick a word. They unscramble the letters to unlock it.' },
+  { type: 'riddle',       emoji: '🤔', label: 'Custom Riddle',   desc: 'Write any question. They must type the exact answer.'       },
+  { type: 'slide',        emoji: '◈',  label: 'Slide Puzzle',   desc: 'Upload an image. Recipients slide tiles to assemble it.'     },
+  { type: 'jigsaw',       emoji: '🧩', label: 'Jigsaw Puzzle',  desc: 'Upload an image. Recipients tap pieces to put it together.'  },
 ]
 
 const GC_BRANDS = [
@@ -79,6 +81,17 @@ export function GiftForm({ userId }: Props) {
   const [gcBrandName, setGcBrandName] = useState<string | null>(null)
   const [gcAmount, setGcAmount]       = useState<number | null>(null)
 
+  const [amazonUrl, setAmazonUrl]         = useState('')
+  const [amazonTitle, setAmazonTitle]     = useState('')
+  const [amazonImage, setAmazonImage]     = useState('')
+  const [amazonAmount, setAmazonAmount]   = useState('')
+  const [amazonPreviewing, setAmazonPreviewing] = useState(false)
+
+  const [scrambleWord, setScrambleWord]   = useState('')
+  const [scrambleHint, setScrambleHint]   = useState('')
+  const [riddleQuestion, setRiddleQuestion] = useState('')
+  const [riddleAnswer, setRiddleAnswer]   = useState('')
+
   const [notificationEmail, setNotificationEmail] = useState('')
 
   const [loading, setLoading] = useState(false)
@@ -86,9 +99,38 @@ export function GiftForm({ userId }: Props) {
 
   const isImagePuzzle  = puzzleType === 'slide' || puzzleType === 'jigsaw'
   const selectedBrand  = GC_BRANDS.find(b => b.id === gcBrandId)
+  const amazonAmountNum = parseFloat(amazonAmount) || 0
   const totalDisplay   = giftMode === 'gift_card' && gcAmount
     ? `$${(gcAmount + 1.99).toFixed(2)}`
+    : giftMode === 'amazon_prize' && amazonAmountNum > 0
+    ? `$${(amazonAmountNum + 1.99).toFixed(2)}`
     : '$1.00'
+
+  function scramble(word: string): string {
+    const arr = word.trim().split('')
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    const result = arr.join('')
+    return result === word.trim() ? scramble(word) : result
+  }
+
+  async function fetchAmazonPreview() {
+    if (!amazonUrl.trim()) return
+    setAmazonPreviewing(true)
+    try {
+      const res = await fetch('/api/amazon/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: amazonUrl.trim() }),
+      })
+      const data = await res.json()
+      if (data.title) setAmazonTitle(data.title)
+      if (data.image) setAmazonImage(data.image)
+    } catch { /* ignore */ }
+    setAmazonPreviewing(false)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -96,6 +138,11 @@ export function GiftForm({ userId }: Props) {
     if (unlockMode === 'puzzle' && !puzzleType) { setError('Please choose a puzzle type.'); return }
     if (unlockMode === 'task_list' && taskItems.filter(t => t.trim()).length === 0) {
       setError('Please add at least one task.'); return
+    }
+    if (giftMode === 'amazon_prize') {
+      if (!amazonUrl.trim()) { setError('Please enter an Amazon product URL.'); return }
+      if (!amazonTitle.trim()) { setError('Please enter the product name.'); return }
+      if (!amazonAmount || parseFloat(amazonAmount) <= 0) { setError('Please enter the prize amount.'); return }
     }
     if (giftMode === 'gift_card' && (!gcBrandId || !gcAmount)) {
       setError('Please select a gift card brand and amount.')
@@ -151,12 +198,74 @@ export function GiftForm({ userId }: Props) {
         return
       }
 
+      // ── Amazon Prize path ───────────────────────────────────────────────────
+      if (giftMode === 'amazon_prize') {
+        if (unlockMode === 'puzzle' && !puzzleType) throw new Error('Please choose a puzzle type.')
+        const amountCents = Math.round(parseFloat(amazonAmount) * 100)
+        // Build puzzle config for amazon prize
+        let apPuzzleConfig: unknown = null
+        if (unlockMode === 'puzzle') {
+          if (puzzleType === 'trivia') {
+            const questions = await fetchTriviaQuestions(triviaCategory, triviaDifficulty, triviaCount)
+            const cat = TRIVIA_CATEGORIES.find(c => c.id === triviaCategory)
+            apPuzzleConfig = { type: 'trivia', category_id: triviaCategory, category_name: cat?.name ?? '', difficulty: triviaDifficulty, questions }
+          } else if (puzzleType === 'math') {
+            const problems = generateMathProblems(mathDifficulty, mathCount)
+            apPuzzleConfig = { type: 'math', difficulty: mathDifficulty, problems }
+          } else if (puzzleType === 'word_scramble') {
+            if (!scrambleWord.trim()) throw new Error('Please enter a word to scramble.')
+            apPuzzleConfig = { type: 'word_scramble', word: scrambleWord.trim(), scrambled: scramble(scrambleWord.trim()), hint: scrambleHint.trim() || undefined }
+          } else if (puzzleType === 'riddle') {
+            if (!riddleQuestion.trim() || !riddleAnswer.trim()) throw new Error('Please enter both a question and answer.')
+            apPuzzleConfig = { type: 'riddle', question: riddleQuestion.trim(), answer: riddleAnswer.trim() }
+          }
+        } else if (unlockMode === 'task_list') {
+          apPuzzleConfig = null
+        }
+        const { error: insertErr } = await supabase.from('gifts').insert({
+          id: giftId, sender_id: userId, title: title.trim(),
+          personal_message: message.trim() || null,
+          content_type: 'amazon_prize',
+          puzzle_type: unlockMode === 'task_list' ? null : puzzleType,
+          puzzle_config: apPuzzleConfig as never,
+          unlock_type: unlockMode,
+          tasks: unlockMode === 'task_list' ? taskItems.filter(t => t.trim()).map((text, i) => ({ id: String(i), text: text.trim() })) as never : null,
+          max_attempts: 5, is_active: false, payment_status: 'pending',
+          notification_email: notificationEmail.trim() || null,
+          amazon_product_url: amazonUrl.trim(),
+          amazon_product_title: amazonTitle.trim() || null,
+          amazon_product_image: amazonImage.trim() || null,
+          amazon_prize_amount_cents: amountCents,
+        } as never)
+        if (insertErr) throw new Error(insertErr.message)
+        const checkoutRes = await fetch('/api/payments/checkout', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gift_id: giftId }),
+        })
+        const checkoutText = await checkoutRes.text()
+        let checkoutData: { url?: string; error?: string } = {}
+        try { checkoutData = JSON.parse(checkoutText) } catch { /* non-JSON */ }
+        if (!checkoutRes.ok || !checkoutData.url) {
+          throw new Error(checkoutData.error ?? `Payment setup failed (${checkoutRes.status}).`)
+        }
+        window.location.href = checkoutData.url
+        return
+      }
+
       // ── Puzzle path ─────────────────────────────────────────────────────────
       let puzzleConfig: unknown
       let filePath: string | null = null
       let actualContentType: ContentType = giftMode === 'gift_card' ? 'gift_card' : contentType
 
-      if (puzzleType === 'trivia') {
+      if (puzzleType === 'word_scramble') {
+        if (!scrambleWord.trim()) throw new Error('Please enter a word to scramble.')
+        puzzleConfig = { type: 'word_scramble', word: scrambleWord.trim(), scrambled: scramble(scrambleWord.trim()), hint: scrambleHint.trim() || undefined }
+
+      } else if (puzzleType === 'riddle') {
+        if (!riddleQuestion.trim() || !riddleAnswer.trim()) throw new Error('Please enter both a question and answer.')
+        puzzleConfig = { type: 'riddle', question: riddleQuestion.trim(), answer: riddleAnswer.trim() }
+
+      } else if (puzzleType === 'trivia') {
         const questions = await fetchTriviaQuestions(triviaCategory, triviaDifficulty, triviaCount)
         const cat = TRIVIA_CATEGORIES.find(c => c.id === triviaCategory)
         puzzleConfig = { type: 'trivia', category_id: triviaCategory, category_name: cat?.name ?? '', difficulty: triviaDifficulty, questions }
@@ -264,6 +373,19 @@ export function GiftForm({ userId }: Props) {
           <div className="font-semibold text-sm">Gift Card</div>
           <div className="text-xs text-muted-foreground mt-0.5">We buy it, they earn it — from $11.99</div>
         </button>
+        <button
+          type="button"
+          onClick={() => setGiftMode('amazon_prize')}
+          className={`flex-1 py-4 px-5 rounded-2xl border-2 text-left transition-all ${
+            giftMode === 'amazon_prize'
+              ? 'border-primary bg-primary/5'
+              : 'border-border hover:border-primary/40'
+          }`}
+        >
+          <div className="text-2xl mb-1">📦</div>
+          <div className="font-semibold text-sm">Amazon Prize</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Pick any product — winner gets it shipped</div>
+        </button>
       </div>
 
       {/* Gift Details */}
@@ -280,6 +402,71 @@ export function GiftForm({ userId }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Amazon Prize */}
+      {giftMode === 'amazon_prize' && (
+        <Card>
+          <CardHeader><CardTitle>Amazon product</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">Paste any Amazon product URL. When the recipient wins, they enter their shipping address and you get an email to order it.</p>
+            <div className="flex gap-2">
+              <Input
+                value={amazonUrl}
+                onChange={e => setAmazonUrl(e.target.value)}
+                placeholder="https://www.amazon.com/dp/..."
+                className="flex-1"
+              />
+              <button
+                type="button"
+                onClick={fetchAmazonPreview}
+                disabled={amazonPreviewing || !amazonUrl.trim()}
+                className="px-4 py-2 rounded-lg border-2 border-primary text-primary text-sm font-semibold hover:bg-primary/5 disabled:opacity-40 shrink-0"
+              >
+                {amazonPreviewing ? '…' : 'Preview'}
+              </button>
+            </div>
+            {amazonImage && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={amazonImage} alt="Product" className="w-24 h-24 object-contain rounded-xl border mx-auto" />
+            )}
+            <div className="space-y-1.5">
+              <Label>Product name *</Label>
+              <Input value={amazonTitle} onChange={e => setAmazonTitle(e.target.value)} placeholder="e.g. LEGO Star Wars Millennium Falcon" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Product image URL (optional)</Label>
+              <Input value={amazonImage} onChange={e => setAmazonImage(e.target.value)} placeholder="Auto-filled from preview, or paste manually" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Prize value ($) *</Label>
+              <Input
+                type="number" min="1" step="0.01"
+                value={amazonAmount} onChange={e => setAmazonAmount(e.target.value)}
+                placeholder="e.g. 29.99"
+              />
+              <p className="text-xs text-muted-foreground">This is the amount you&apos;ll be charged (+ $1.99 service fee). You order the product yourself when notified.</p>
+            </div>
+            {amazonAmount && parseFloat(amazonAmount) > 0 && (
+              <div className="rounded-xl bg-muted/60 p-4 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Prize value</span>
+                  <span>${parseFloat(amazonAmount).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Puzzle fee</span><span>$1.00</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Service fee</span><span>$0.99</span>
+                </div>
+                <div className="flex justify-between font-semibold pt-1 border-t border-border">
+                  <span>Total</span>
+                  <span>${(parseFloat(amazonAmount) + 1.99).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Gift Card Brand + Amount */}
       {giftMode === 'gift_card' && (
@@ -442,6 +629,34 @@ export function GiftForm({ userId }: Props) {
         <Card>
           <CardHeader><CardTitle>Puzzle settings</CardTitle></CardHeader>
           <CardContent className="space-y-5">
+
+            {puzzleType === 'word_scramble' && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Word or phrase to scramble *</Label>
+                  <Input value={scrambleWord} onChange={e => setScrambleWord(e.target.value)} placeholder="e.g. SURPRISE or HAPPY BIRTHDAY" />
+                  <p className="text-xs text-muted-foreground">The letters will be shuffled. Recipient must unscramble them.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Hint (optional)</Label>
+                  <Input value={scrambleHint} onChange={e => setScrambleHint(e.target.value)} placeholder="e.g. It's something you celebrate once a year" />
+                </div>
+              </>
+            )}
+
+            {puzzleType === 'riddle' && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Your question or riddle *</Label>
+                  <Textarea value={riddleQuestion} onChange={e => setRiddleQuestion(e.target.value)} rows={3} placeholder="e.g. What's my mom's maiden name? Or: I have cities but no houses — what am I?" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Exact answer *</Label>
+                  <Input value={riddleAnswer} onChange={e => setRiddleAnswer(e.target.value)} placeholder="e.g. Smith (not case-sensitive)" />
+                  <p className="text-xs text-muted-foreground">The recipient must type this exactly (spaces and capitalization are ignored).</p>
+                </div>
+              </>
+            )}
 
             {puzzleType === 'trivia' && (
               <>

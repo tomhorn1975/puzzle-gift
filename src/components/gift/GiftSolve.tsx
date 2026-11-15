@@ -5,6 +5,8 @@ import { TriviaPuzzle } from '@/components/puzzles/TriviaPuzzle'
 import { MathPuzzle } from '@/components/puzzles/MathPuzzle'
 import { SlidePuzzle } from '@/components/puzzles/SlidePuzzle'
 import { JigsawPuzzle } from '@/components/puzzles/JigsawPuzzle'
+import { WordScramblePuzzle } from '@/components/puzzles/WordScramblePuzzle'
+import { RiddlePuzzle } from '@/components/puzzles/RiddlePuzzle'
 import { ContentReveal } from '@/components/gifts/ContentReveal'
 import type { SanitizedPuzzleConfig, ContentType, PuzzleType } from '@/lib/types'
 
@@ -102,6 +104,26 @@ export function GiftSolve({
       body: JSON.stringify(body),
     })
     return res.json()
+  }
+
+  async function handleTextAnswerSubmit(answer: string) {
+    setLoading(true)
+    setErrorMessage(null)
+    try {
+      const data = await callSolveApi({ answer })
+      if (data.success) {
+        setRevealed(data.content)
+        setState('correct')
+      } else {
+        setState('wrong')
+        setErrorMessage(data.message ?? 'Wrong answer — try again!')
+      }
+    } catch {
+      setErrorMessage('Something went wrong. Please try again.')
+      setState('wrong')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleAnswerSubmit(answers: Record<string, number>) {
@@ -280,6 +302,26 @@ export function GiftSolve({
                 imageUrl={puzzleConfig.image_url}
                 gridSize={puzzleConfig.grid_size}
                 onSolve={handlePuzzleSolved}
+              />
+            )}
+
+            {puzzleConfig?.type === 'word_scramble' && (
+              <WordScramblePuzzle
+                config={puzzleConfig}
+                onSubmit={handleTextAnswerSubmit}
+                onRetry={handleRetry}
+                loading={loading}
+                showRetry={state === 'wrong'}
+              />
+            )}
+
+            {puzzleConfig?.type === 'riddle' && (
+              <RiddlePuzzle
+                config={puzzleConfig}
+                onSubmit={handleTextAnswerSubmit}
+                onRetry={handleRetry}
+                loading={loading}
+                showRetry={state === 'wrong'}
               />
             )}
           </div>

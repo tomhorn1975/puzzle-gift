@@ -2,10 +2,11 @@
 
 import Image from 'next/image'
 import { Card, CardContent } from '@/components/ui/card'
+import { PrizeClaim } from './PrizeClaim'
 import type { ContentType } from '@/lib/types'
 
 interface Content {
-  type: 'text' | 'url' | 'assembled' | 'gift_card'
+  type: 'text' | 'url' | 'assembled' | 'gift_card' | 'amazon_prize'
   value?: string
   url?: string
   image_url?: string
@@ -13,6 +14,10 @@ interface Content {
   brand_name?: string
   amount_cents?: number
   claim_link?: string
+  gift_id?: string
+  product_title?: string | null
+  product_image?: string | null
+  prize_amount_cents?: number | null
 }
 
 interface Props {
@@ -65,6 +70,15 @@ export function ContentReveal({ content, contentType }: Props) {
               )}
             </div>
           )}
+          {content.type === 'amazon_prize' && content.gift_id && (
+            <PrizeClaim
+              giftId={content.gift_id}
+              productTitle={content.product_title}
+              productImage={content.product_image}
+              prizeAmountCents={content.prize_amount_cents}
+            />
+          )}
+
           {content.type === 'gift_card' && content.claim_link && (
             <div className="text-center space-y-5 py-2">
               <div className="text-5xl">💳</div>
